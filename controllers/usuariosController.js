@@ -94,6 +94,54 @@ exports.eliminarUsuario = async (req, res) => {
   }
 };
 
+// Función para cambiar contraseña
+exports.cambiarContrasena = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, currentPassword, newPassword } = req.body;
+
+    // Validar que se proporcionen todos los campos
+    if (!email || !currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        mensaje: "Email, contraseña actual y nueva contraseña son requeridos" 
+      });
+    }
+
+    // Buscar el usuario por ID y email para mayor seguridad
+    const usuario = await User.findOne({ _id: id, email });
+    if (!usuario) {
+      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    }
+
+    // Verificar la contraseña actual
+    const passwordValid = await bcrypt.compare(currentPassword, usuario.password);
+    if (!passwordValid) {
+      return res.status(400).json({ mensaje: "Contraseña actual incorrecta" });
+    }
+
+    // Validar que la nueva contraseña sea diferente
+    const samePassword = await bcrypt.compare(newPassword, usuario.password);
+    if (samePassword) {
+      return res.status(400).json({ 
+        mensaje: "La nueva contraseña debe ser diferente a la actual" 
+      });
+    }
+
+    // Encriptar la nueva contraseña
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar la contraseña
+    await User.findByIdAndUpdate(id, { password: hashedNewPassword });
+
+    res.json({ mensaje: "Contraseña actualizada correctamente" });
+  } catch (err) {
+    res.status(500).json({
+      mensaje: "Error al cambiar contraseña",
+      error: err.message,
+    });
+  }
+};
+
 exports.eliminarCuentaUsuario = async (req, res) => {
   try {
     const { id } = req.params;
