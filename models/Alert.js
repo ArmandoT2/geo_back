@@ -15,6 +15,11 @@ const alertaSchema = new mongoose.Schema(
       enum: ["pendiente", "en camino", "atendida", "cancelada"],
       default: "pendiente",
     },
+    visible: { 
+      type: Boolean, 
+      default: true,
+      required: true 
+    }, // Campo para controlar visibilidad de alertas
     atendidoPor: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // usuario que atiende (policía)
     evidencia: [{ type: String }],
     rutaAtencion: {
