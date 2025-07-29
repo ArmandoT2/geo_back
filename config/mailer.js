@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer");
+const nodemailer = require('nodemailer');
 
 async function createTestTransporter() {
   const testAccount = await nodemailer.createTestAccount();
@@ -9,8 +9,8 @@ async function createTestTransporter() {
     secure: testAccount.smtp.secure,
     auth: {
       user: testAccount.user,
-      pass: testAccount.pass,
-    },
+      pass: testAccount.pass
+    }
   });
 
   return transporter;

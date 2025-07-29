@@ -10,7 +10,7 @@ console.log('PORT:', process.env.PORT);
 const usuariosRoutes = require('./routes/usuarios');
 const alertaRoutes = require('./routes/alertas');
 const contactosRoutes = require('./routes/contactosRoutes');
-const notificationRoutes = require('./routes/notificaciones')
+const notificationRoutes = require('./routes/notificaciones');
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -37,10 +37,10 @@ const PORT = process.env.PORT || 3000;
 
 // Ruta de test para verificar conectividad
 app.get('/api/test', (req, res) => {
-  res.json({ 
-    message: 'Servidor funcionando correctamente', 
+  res.json({
+    message: 'Servidor funcionando correctamente',
     timestamp: new Date().toISOString(),
-    port: PORT 
+    port: PORT
   });
 });
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

@@ -8,7 +8,10 @@ const userSchema = new mongoose.Schema({
   phone:    { type: String },
   address:  { type: String },
   genero:   { type: String, enum: ['masculino', 'femenino'], required: true },
-  rol:      { type: String, default: 'ciudadano' } // Por defecto ciudadano
+  rol:      { type: String, default: 'ciudadano' }, // Por defecto ciudadano
+  activo:   { type: Boolean, default: true } // Campo para soft delete
+}, {
+  timestamps: true // Agrega createdAt y updatedAt automáticamente
 });
 
 module.exports = mongoose.model('User', userSchema);
