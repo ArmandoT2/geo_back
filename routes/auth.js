@@ -12,6 +12,19 @@ router.post('/register', async(req, res) => {
     if (exist)
       return res.status(400).json({ message: 'Usuario o correo ya existen' });
 
+    // Validar criterios de la contraseña
+    if (!password || password.length < 8) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos una letra mayúscula' });
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos un carácter especial' });
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     const user = new User({
       username,
@@ -135,9 +148,17 @@ router.post('/reset-password', async(req, res) => {
       return res.status(400).json({ message: 'Cuenta desactivada. Contacta al administrador.' });
     }
 
-    // Validar que la nueva contraseña tenga al menos 6 caracteres
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    // Validar criterios de la nueva contraseña
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos una letra mayúscula' });
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos un carácter especial' });
     }
 
     // Encriptar la nueva contraseña

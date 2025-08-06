@@ -117,6 +117,25 @@ exports.cambiarContrasena = async(req, res) => {
       });
     }
 
+    // Validar criterios de la nueva contraseña
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña debe tener al menos 8 caracteres'
+      });
+    }
+
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña debe tener al menos una letra mayúscula'
+      });
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña debe tener al menos un carácter especial'
+      });
+    }
+
     // Buscar el usuario por ID y email para mayor seguridad
     const usuario = await User.findOne({ _id: id, email });
     if (!usuario) {

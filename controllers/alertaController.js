@@ -229,3 +229,47 @@ exports.obtenerTodas = async(req, res) => {
     });
   }
 };
+
+exports.cancelarAlerta = async(req, res) => {
+  try {
+    const alertaId = req.params.id;
+    
+    console.log('🚫 Cancelando alerta:', alertaId);
+    
+    const alertaActualizada = await Alert.findByIdAndUpdate(
+      alertaId,
+      { 
+        status: 'cancelada',
+        visible: false // Ocultar la alerta cancelada
+      },
+      { new: true }
+    );
+
+    if (!alertaActualizada) {
+      return res.status(404).json({ mensaje: 'Alerta no encontrada' });
+    }
+
+    console.log('✅ Alerta cancelada exitosamente:', alertaActualizada._id);
+
+    // Crear notificación de cancelación para los servicios de emergencia
+    const nuevaNotificacion = new Notification({
+      alerta: alertaActualizada._id,
+      mensaje: `Alerta cancelada por el usuario en ${alertaActualizada.direccion}`,
+      tipo: 'alerta_cancelada'
+    });
+    
+    await nuevaNotificacion.save();
+    console.log('✅ Notificación de alerta cancelada creada:', nuevaNotificacion._id);
+
+    res.status(200).json({
+      mensaje: 'Alerta cancelada exitosamente',
+      alerta: alertaActualizada
+    });
+  } catch (error) {
+    console.error('❌ Error al cancelar alerta:', error.message);
+    res.status(500).json({
+      mensaje: 'Error al cancelar alerta',
+      error: error.message
+    });
+  }
+};
