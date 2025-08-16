@@ -22,6 +22,7 @@ const alertaSchema = new mongoose.Schema(
     }, // Campo para controlar visibilidad de alertas
     atendidoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // usuario que atiende (policía)
     evidencia: [{ type: String }],
+    detallesAtencion: { type: String }, // Detalles del gendarme sobre la atención realizada
     rutaAtencion: {
       origen: {
         lat: Number,

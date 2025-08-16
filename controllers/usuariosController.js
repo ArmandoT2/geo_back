@@ -33,36 +33,53 @@ exports.crearUsuario = async(req, res) => {
     const { username, fullName, email, password, phone, address, genero, rol } =
       req.body;
 
+    // Validaciones básicas
+    if (!username || !fullName || !email || !password) {
+      return res.status(400).json({ 
+        message: 'Todos los campos requeridos deben ser completados' 
+      });
+    }
+
     // Verificar si ya existe un usuario con el mismo username o email
     const exist = await User.findOne({
-      $or: [{ username }, { email }]
+      $or: [
+        { username: username.trim() }, 
+        { email: email.trim() }
+      ]
     });
 
     if (exist) {
-      return res.status(400).json({ message: 'Usuario o correo ya existen' });
+      return res.status(400).json({ 
+        message: 'Los datos proporcionados no pueden ser utilizados' 
+      });
     }
 
     // Encriptar la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const nuevoUsuario = new User({
-      username,
-      fullName,
-      email,
+      username: username.trim(),
+      fullName: fullName.trim(),
+      email: email.trim(),
       password: hashedPassword,
-      phone,
-      address,
+      phone: phone ? phone.trim() : '',
+      address: address ? address.trim() : '',
       genero,
       rol: rol || 'ciudadano' // Por defecto "ciudadano" - solo admin puede crear otros roles
     });
 
     await nuevoUsuario.save();
 
-    res.status(201).json(nuevoUsuario);
+    // No devolver la contraseña ni información sensible
+    const { password: _, ...usuarioSinPassword } = nuevoUsuario.toObject();
+    res.status(201).json({
+      message: 'Usuario creado exitosamente',
+      usuario: usuarioSinPassword
+    });
   } catch (err) {
+    console.error('Error al crear usuario:', err);
     res.status(500).json({
-      mensaje: 'Error al crear usuario',
-      error: err.message
+      mensaje: 'Error interno del servidor'
     });
   }
 };
@@ -111,7 +128,8 @@ exports.cambiarContrasena = async(req, res) => {
     const { email, currentPassword, newPassword } = req.body;
 
     // Validar que se proporcionen todos los campos
-    if (!email || !currentPassword || !newPassword) {
+    if (!email || !currentPassword || !newPassword || 
+        email.trim() === '' || currentPassword.trim() === '' || newPassword.trim() === '') {
       return res.status(400).json({
         mensaje: 'Email, contraseña actual y nueva contraseña son requeridos'
       });
@@ -137,15 +155,17 @@ exports.cambiarContrasena = async(req, res) => {
     }
 
     // Buscar el usuario por ID y email para mayor seguridad
-    const usuario = await User.findOne({ _id: id, email });
+    const usuario = await User.findOne({ _id: id, email: email.trim() });
     if (!usuario) {
-      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+      // Simular el tiempo de verificación de contraseña para evitar timing attacks
+      await bcrypt.compare('dummy', '$2a$10$invalidhashtopreventtimingattack');
+      return res.status(400).json({ mensaje: 'Credenciales inválidas' });
     }
 
     // Verificar la contraseña actual
     const passwordValid = await bcrypt.compare(currentPassword, usuario.password);
     if (!passwordValid) {
-      return res.status(400).json({ mensaje: 'Contraseña actual incorrecta' });
+      return res.status(400).json({ mensaje: 'Credenciales inválidas' });
     }
 
     // Validar que la nueva contraseña sea diferente
@@ -163,6 +183,61 @@ exports.cambiarContrasena = async(req, res) => {
     await User.findByIdAndUpdate(id, { password: hashedNewPassword });
 
     res.json({ mensaje: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    res.status(500).json({
+      mensaje: 'Error al cambiar contraseña',
+      error: err.message
+    });
+  }
+};
+
+// Función para cambiar contraseña por administrador
+exports.cambiarContrasenaAdmin = async(req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    // Validar que se proporcione la nueva contraseña
+    if (!newPassword || newPassword.trim() === '') {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña es requerida'
+      });
+    }
+
+    // Validar criterios de la nueva contraseña
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña debe tener al menos 8 caracteres'
+      });
+    }
+
+    if (!/[A-Z]/.test(newPassword)) {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña debe tener al menos una letra mayúscula'
+      });
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
+      return res.status(400).json({
+        mensaje: 'La nueva contraseña debe tener al menos un carácter especial'
+      });
+    }
+
+    // Buscar el usuario por ID
+    const usuario = await User.findById(id);
+    if (!usuario) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+
+    // Encriptar la nueva contraseña
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar la contraseña
+    await User.findByIdAndUpdate(id, { password: hashedNewPassword });
+
+    res.json({ 
+      mensaje: `Contraseña actualizada correctamente para ${usuario.fullName}` 
+    });
   } catch (err) {
     res.status(500).json({
       mensaje: 'Error al cambiar contraseña',

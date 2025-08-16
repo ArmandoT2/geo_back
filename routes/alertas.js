@@ -8,5 +8,6 @@ router.get('/usuario/:id', alertaController.obtenerAlertasPorUsuario);
 router.put('/:id/status', alertaController.actualizarEstadoAlerta);
 router.put('/:id/cancelar', alertaController.cancelarAlerta);
 router.get('/pendientes', alertaController.obtenerAlertasPendientes);
+router.get('/atendidas-por-policia/:policiaId', alertaController.obtenerAlertasAtendidasPorPolicia);
 
 module.exports = router;

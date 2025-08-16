@@ -8,9 +8,22 @@ router.post('/register', async(req, res) => {
   const { username, fullName, email, password, phone, address, genero } = req.body;
 
   try {
-    const exist = await User.findOne({ $or: [{ email }, { username }] });
-    if (exist)
-      return res.status(400).json({ message: 'Usuario o correo ya existen' });
+    // Validaciones básicas
+    if (!username || !fullName || !email || !password ||
+        username.trim() === '' || fullName.trim() === '' || email.trim() === '') {
+      return res.status(400).json({ message: 'Todos los campos requeridos deben ser completados' });
+    }
+
+    const exist = await User.findOne({ 
+      $or: [
+        { email: email.trim() }, 
+        { username: username.trim() }
+      ] 
+    });
+    
+    if (exist) {
+      return res.status(400).json({ message: 'Los datos proporcionados no pueden ser utilizados' });
+    }
 
     // Validar criterios de la contraseña
     if (!password || password.length < 8) {
@@ -27,37 +40,54 @@ router.post('/register', async(req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const user = new User({
-      username,
-      fullName,
-      email,
+      username: username.trim(),
+      fullName: fullName.trim(),
+      email: email.trim(),
       password: hashed,
-      phone,
-      address,
+      phone: phone ? phone.trim() : '',
+      address: address ? address.trim() : '',
       genero,
       rol: 'ciudadano' // Forzar rol de ciudadano en registro público
     });
     await user.save();
     res.status(201).json({ message: 'Usuario creado exitosamente' });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error('Error en registro:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
 // Login
 router.post('/login', async(req, res) => {
   const { email, password } = req.body;
+  
+  // Validación básica de entrada
+  if (!email || !password || email.trim() === '' || password.trim() === '') {
+    return res.status(400).json({ message: 'Credenciales inválidas' });
+  }
+
   try {
-    const user = await User.findOne({ email });
-    if (!user)
-      return res.status(400).json({ message: 'Usuario no encontrado' });
+    const user = await User.findOne({ email: email.trim() });
+    
+    // Si no existe el usuario, simular el tiempo de verificación de contraseña
+    // para evitar ataques de timing
+    if (!user) {
+      // Simular bcrypt.compare para mantener tiempo constante
+      await bcrypt.compare(password, '$2a$10$invalidhashtopreventtimingattack');
+      return res.status(400).json({ message: 'Credenciales inválidas' });
+    }
 
     // Verificar si el usuario está activo (solo si el campo existe)
-    if (user.activo !== undefined && user.activo === false)
-      return res.status(400).json({ message: 'Cuenta desactivada. Contacta al administrador.' });
+    if (user.activo !== undefined && user.activo === false) {
+      // Simular bcrypt.compare para mantener tiempo constante
+      await bcrypt.compare(password, '$2a$10$invalidhashtopreventtimingattack');
+      return res.status(400).json({ message: 'Credenciales inválidas' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: 'Contraseña incorrecta' });
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Credenciales inválidas' });
+    }
 
     // Respuesta exitosa con todos los datos necesarios
     res.json({
@@ -78,7 +108,7 @@ router.post('/login', async(req, res) => {
     });
   } catch (error) {
     console.error('Error en login:', error);
-    res.status(500).json({ message: 'Error interno del servidor', error: error.message });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
@@ -110,16 +140,34 @@ router.put('/change-password', async(req, res) => {
 router.post('/forgot-password', async(req, res) => {
   const { email } = req.body;
 
+  // Validación básica de entrada
+  if (!email || email.trim() === '') {
+    return res.status(400).json({ message: 'Email es requerido' });
+  }
+
   try {
     // Verificar que el email existe
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim() });
+    
+    // Por seguridad, siempre respondemos que el proceso fue exitoso
+    // independientemente de si el email existe o no
     if (!user) {
-      return res.status(404).json({ message: 'Usuario no encontrado con ese email' });
+      // Simulamos un pequeño delay para evitar ataques de timing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return res.json({ 
+        message: 'Si el email existe en nuestro sistema, recibirás instrucciones',
+        success: true 
+      });
     }
 
     // Verificar que el usuario esté activo
     if (user.activo !== undefined && user.activo === false) {
-      return res.status(400).json({ message: 'Cuenta desactivada. Contacta al administrador.' });
+      // Simulamos un pequeño delay para evitar ataques de timing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return res.json({ 
+        message: 'Si el email existe en nuestro sistema, recibirás instrucciones',
+        success: true 
+      });
     }
 
     res.json({ 
@@ -136,20 +184,14 @@ router.post('/forgot-password', async(req, res) => {
 router.post('/reset-password', async(req, res) => {
   const { email, newPassword } = req.body;
 
+  // Validación básica de entrada
+  if (!email || !newPassword || email.trim() === '' || newPassword.trim() === '') {
+    return res.status(400).json({ message: 'Email y nueva contraseña son requeridos' });
+  }
+
   try {
-    // Buscar el usuario por email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    // Verificar que el usuario esté activo
-    if (user.activo !== undefined && user.activo === false) {
-      return res.status(400).json({ message: 'Cuenta desactivada. Contacta al administrador.' });
-    }
-
-    // Validar criterios de la nueva contraseña
-    if (!newPassword || newPassword.length < 8) {
+    // Validar criterios de la nueva contraseña primero
+    if (newPassword.length < 8) {
       return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
     }
 
@@ -159,6 +201,23 @@ router.post('/reset-password', async(req, res) => {
 
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
       return res.status(400).json({ message: 'La contraseña debe tener al menos un carácter especial' });
+    }
+
+    // Buscar el usuario por email
+    const user = await User.findOne({ email: email.trim() });
+    if (!user) {
+      // Por seguridad, simulamos el proceso completo
+      await bcrypt.genSalt(10);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return res.status(400).json({ message: 'No se pudo procesar la solicitud' });
+    }
+
+    // Verificar que el usuario esté activo
+    if (user.activo !== undefined && user.activo === false) {
+      // Por seguridad, simulamos el proceso completo
+      await bcrypt.genSalt(10);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return res.status(400).json({ message: 'No se pudo procesar la solicitud' });
     }
 
     // Encriptar la nueva contraseña
