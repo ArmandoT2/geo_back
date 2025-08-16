@@ -13,22 +13,23 @@ function validarDetalle(detalle) {
   const detalleTrimed = detalle.trim();
   
   // Validar longitud de caracteres
-  if (detalleTrimed.length < 10) {
-    return 'El detalle debe tener al menos 10 caracteres';
+  if (detalleTrimed.length < 5) {
+    return 'El detalle debe tener al menos 5 caracteres';
   }
   
-  if (detalleTrimed.length > 200) {
-    return 'El detalle no puede exceder 200 caracteres';
+  if (detalleTrimed.length > 300) {
+    return 'El detalle no puede exceder 300 caracteres';
   }
   
   // Validar número de palabras
-  const palabras = detalleTrimed.split(/\s+/);
-  if (palabras.length < 5) {
-    return 'El detalle debe contener al menos 5 palabras';
+  const palabras = detalleTrimed.split(/\s+/).filter(palabra => palabra.length > 0);
+  
+  if (palabras.length < 3) {
+    return 'El detalle debe contener al menos 3 palabras';
   }
   
-  if (palabras.length > 50) {
-    return 'El detalle no puede contener más de 50 palabras';
+  if (palabras.length > 100) {
+    return 'El detalle no puede contener más de 100 palabras';
   }
 
   return null; // No hay errores
@@ -36,6 +37,11 @@ function validarDetalle(detalle) {
 
 exports.crearAlerta = async(req, res) => {
   try {
+    console.log('🚨 ========================================');
+    console.log('🚨 INICIANDO CREACIÓN DE ALERTA');
+    console.log('🚨 ========================================');
+    console.log('📥 req.body completo:', JSON.stringify(req.body, null, 2));
+    
     const transporter = await createTransporter();
 
     const {
@@ -53,13 +59,46 @@ exports.crearAlerta = async(req, res) => {
       codigoPostal
     } = req.body;
 
+    console.log('📋 Datos extraídos:');
+    console.log('  - Direccion:', direccion);
+    console.log('  - Usuario creador:', usuarioCreador);
+    console.log('  - Detalle:', detalle);
+    console.log('  - Ubicación:', ubicacion);
+    console.log('  - FechaHora:', fechaHora);
+
+    // Validaciones básicas
+    if (!direccion) {
+      console.log('❌ Error: Dirección no proporcionada');
+      return res.status(400).json({
+        mensaje: 'La dirección es requerida'
+      });
+    }
+
+    if (!usuarioCreador) {
+      console.log('❌ Error: Usuario creador no proporcionado');
+      return res.status(400).json({
+        mensaje: 'El usuario creador es requerido'
+      });
+    }
+
+    if (!ubicacion || !ubicacion.lat || !ubicacion.lng) {
+      console.log('❌ Error: Ubicación no válida');
+      return res.status(400).json({
+        mensaje: 'La ubicación (latitud y longitud) es requerida'
+      });
+    }
+
     // Validar el detalle usando la función helper
     const errorDetalle = validarDetalle(detalle);
     if (errorDetalle) {
+      console.log('❌ Error en validación de detalle:', errorDetalle);
       return res.status(400).json({
         mensaje: errorDetalle
       });
     }
+
+    console.log('✅ Detalle validado correctamente');
+    console.log('💾 Creando objeto alerta...');
 
     const nuevaAlerta = new Alert({
       direccion,
@@ -78,6 +117,7 @@ exports.crearAlerta = async(req, res) => {
       codigoPostal
     });
 
+    console.log('💾 Guardando alerta en BD...');
     await nuevaAlerta.save();
     console.log('✅ Alerta guardada con ID:', nuevaAlerta._id);
 
@@ -133,16 +173,25 @@ exports.crearAlerta = async(req, res) => {
 
     await Promise.all(envios);
 
+    console.log('🎉 ========================================');
+    console.log('🎉 ALERTA CREADA EXITOSAMENTE');
+    console.log('🎉 ID:', nuevaAlerta._id);
+    console.log('🎉 ========================================');
+
     res.status(201).json({
       alerta: nuevaAlerta,
       notificacion: nuevaNotificacion,
       mensaje: 'Alerta creada y correos enviados a contactos'
     });
   } catch (error) {
-    console.error(
-      '❌ Error al crear la alerta y enviar correos:',
-      error.message
-    );
+    console.error('❌ ========================================');
+    console.error('❌ ERROR AL CREAR LA ALERTA');
+    console.error('❌ ========================================');
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ ========================================');
+    
     res.status(500).json({
       mensaje: 'Error al crear la alerta',
       error: error.message
@@ -154,60 +203,16 @@ exports.obtenerAlertasPorUsuario = async(req, res) => {
   try {
     const usuarioId = req.params.id;
     
-    console.log('🔍 ========================================');
-    console.log('🔍 OBTENIENDO ALERTAS PARA USUARIO CIUDADANO');
-    console.log('🔍 ID del usuario:', usuarioId);
-    console.log('🔍 Tipo del ID:', typeof usuarioId);
-    console.log('🔍 ========================================');
-    
-    // Primero verificar cuántas alertas hay en total para este usuario
-    const totalAlertas = await Alert.countDocuments({ usuarioCreador: usuarioId });
-    console.log('📊 Total de alertas para este usuario (sin filtros):', totalAlertas);
-    
-    const alertasVisibles = await Alert.countDocuments({ 
-      usuarioCreador: usuarioId, 
-      visible: true 
-    });
-    console.log('👁️ Total de alertas visibles para este usuario:', alertasVisibles);
-    
-    // Para usuarios ciudadanos, mostrar todas sus alertas (no filtrar por visible)
-    // El campo visible está más orientado a uso administrativo
+    // Obtener las alertas del usuario
     const alertas = await Alert.find({
       usuarioCreador: usuarioId
     }).sort({
       createdAt: -1
     });
     
-    console.log('✅ Alertas encontradas para enviar:', alertas.length);
-    
-    if (alertas.length > 0) {
-      console.log('📋 DETALLES DE LAS ALERTAS:');
-      alertas.forEach((alerta, index) => {
-        console.log(`   ${index + 1}. ID: ${alerta._id}`);
-        console.log(`      Detalle: ${alerta.detalle}`);
-        console.log(`      Status: ${alerta.status}`);
-        console.log(`      Visible: ${alerta.visible}`);
-        console.log(`      Creador: ${alerta.usuarioCreador}`);
-        console.log(`      CreatedAt: ${alerta.createdAt}`);
-      });
-    } else {
-      console.log('⚠️ NO SE ENCONTRARON ALERTAS PARA ESTE USUARIO');
-      
-      // Debug: verificar si hay alertas para este usuario en la base de datos
-      const totalAlertasUsuario = await Alert.countDocuments({ usuarioCreador: usuarioId });
-      console.log('🔍 Debug - Total alertas en BD para este usuario:', totalAlertasUsuario);
-      
-      if (totalAlertasUsuario > 0) {
-        const muestraAlertas = await Alert.find({ usuarioCreador: usuarioId }).limit(3);
-        console.log('🔍 Debug - Muestra de alertas encontradas:');
-        muestraAlertas.forEach((alerta, index) => {
-          console.log(`   ${index + 1}. Visible: ${alerta.visible}, Status: ${alerta.status}, Detalle: ${alerta.detalle}`);
-        });
-      }
-    }
-    
     res.status(200).json(alertas);
   } catch (error) {
+    console.error('Error en obtenerAlertasPorUsuario:', error);
     res
       .status(500)
       .json({ mensaje: 'Error al obtener alertas', error: error.message });
